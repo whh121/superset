@@ -63,6 +63,7 @@ class ReportRecipientType(StrEnum):
     EMAIL = "Email"
     SLACK = "Slack"
     SLACKV2 = "SlackV2"
+    WEBHOOK = "Webhook" # add by wht
 
 
 class ReportState(StrEnum):

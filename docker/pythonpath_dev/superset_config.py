@@ -55,10 +55,14 @@ SQLALCHEMY_EXAMPLES_URI = (
     f"{EXAMPLES_HOST}:{EXAMPLES_PORT}/{EXAMPLES_DB}"
 )
 
-REDIS_HOST = os.getenv("REDIS_HOST", "redis")
-REDIS_PORT = os.getenv("REDIS_PORT", "6379")
+# modify by wht
+# REDIS_HOST = os.getenv("REDIS_HOST", "redis")
+# REDIS_PORT = os.getenv("REDIS_PORT", "6379")
+REDIS_HOST = "superset_cache"
+REDIS_PORT = "6379"
 REDIS_CELERY_DB = os.getenv("REDIS_CELERY_DB", "0")
-REDIS_RESULTS_DB = os.getenv("REDIS_RESULTS_DB", "1")
+# REDIS_RESULTS_DB = os.getenv("REDIS_RESULTS_DB", "1")
+REDIS_RESULTS_DB = os.getenv("REDIS_RESULTS_DB", "0")
 
 RESULTS_BACKEND = FileSystemCache("/app/superset_home/sqllab")
 
@@ -72,6 +76,8 @@ CACHE_CONFIG = {
 }
 DATA_CACHE_CONFIG = CACHE_CONFIG
 
+# modify by wht this to add user-defined
+FEATURE_FLAGS = {"ALERT_REPORTS": True}
 
 class CeleryConfig:
     broker_url = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_CELERY_DB}"
@@ -82,8 +88,16 @@ class CeleryConfig:
         "superset.tasks.cache",
     )
     result_backend = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_RESULTS_DB}"
-    worker_prefetch_multiplier = 1
-    task_acks_late = False
+    # modify by wht
+    # worker_prefetch_multiplier = 1
+    # task_acks_late = False
+    worker_prefetch_multiplier = 10
+    task_acks_late = True
+    task_annotations = {
+        "sql_lab.get_sql_results": {
+            "rate_limit": "100/s",
+        },
+    }
     beat_schedule = {
         "reports.scheduler": {
             "task": "reports.scheduler",
@@ -91,18 +105,27 @@ class CeleryConfig:
         },
         "reports.prune_log": {
             "task": "reports.prune_log",
-            "schedule": crontab(minute=10, hour=0),
+            # modify by wht
+            #"schedule": crontab(minute=10, hour=0),
+            "schedule": crontab(minute=0, hour=0),
         },
     }
 
 
 CELERY_CONFIG = CeleryConfig
 
-FEATURE_FLAGS = {"ALERT_REPORTS": True}
-ALERT_REPORTS_NOTIFICATION_DRY_RUN = True
+#modify by wht
+SCREENSHOT_LOCATE_WAIT = 100
+SCREENSHOT_LOAD_WAIT = 600
+
+# modify by wht this to add user-defined
+ALERT_REPORTS_NOTIFICATION_DRY_RUN = False
 WEBDRIVER_BASEURL = "http://superset:8088/"  # When using docker compose baseurl should be http://superset_app:8088/  # noqa: E501
 # The base URL for the email report hyperlinks.
-WEBDRIVER_BASEURL_USER_FRIENDLY = WEBDRIVER_BASEURL
+# modify by wht
+# WEBDRIVER_BASEURL_USER_FRIENDLY = WEBDRIVER_BASEURL
+WEBDRIVER_BASEURL_USER_FRIENDLY = "http://172.31.37.206:8088"
+
 SQLLAB_CTAS_NO_LIMIT = True
 
 log_level_text = os.getenv("SUPERSET_LOG_LEVEL", "INFO")
@@ -133,3 +156,29 @@ try:
     )
 except ImportError:
     logger.info("Using default Docker config...")
+
+# modify by wht
+# WebDriver configuration
+# If you use Firefox, you can stick with default values
+# If you use Chrome, then add the following WEBDRIVER_TYPE and WEBDRIVER_OPTION_ARGS
+WEBDRIVER_TYPE = "chrome"
+WEBDRIVER_OPTION_ARGS = [
+    "--force-device-scale-factor=2.0",
+    "--high-dpi-support=2.0",
+    "--headless",
+    "--disable-gpu",
+    "--disable-dev-shm-usage",
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-extensions",
+]
+
+from superset.tasks.types import FixedExecutor
+ALERT_REPORTS_EXECUTORS = [FixedExecutor("admin")]
+
+# Set a minimum interval threshold between executions (for each Alert/Report)
+# Value should be an integer
+# 最小执行间隔配置
+from datetime import timedelta
+ALERT_MINIMUM_INTERVAL = int(timedelta(minutes=10).total_seconds())
+REPORT_MINIMUM_INTERVAL = int(timedelta(minutes=5).total_seconds())
