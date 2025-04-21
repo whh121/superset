@@ -77,7 +77,10 @@ CACHE_CONFIG = {
 DATA_CACHE_CONFIG = CACHE_CONFIG
 
 # modify by wht this to add user-defined
-FEATURE_FLAGS = {"ALERT_REPORTS": True}
+FEATURE_FLAGS = {
+    "ALERT_REPORTS": True,
+    'DASHBOARD_RBAC': True
+}
 
 class CeleryConfig:
     broker_url = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_CELERY_DB}"
@@ -182,3 +185,14 @@ ALERT_REPORTS_EXECUTORS = [FixedExecutor("admin")]
 from datetime import timedelta
 ALERT_MINIMUM_INTERVAL = int(timedelta(minutes=10).total_seconds())
 REPORT_MINIMUM_INTERVAL = int(timedelta(minutes=5).total_seconds())
+
+# 添加汉化支持
+# https://zhuanlan.zhihu.com/p/6623611242
+# BABEL_DEFAULT_LOCALE='zh'  # 默认语言为中文
+# BABEL_DEFAULT_FOLDER = 'superset/translations'  # 多语言路径
+# 可选语言
+# LANGUAGES = {
+#     'zh': {'flag': 'cn', 'name': '简体中文'},
+#     'en': {'flag': 'us', 'name': 'English'}
+# }
+# 
