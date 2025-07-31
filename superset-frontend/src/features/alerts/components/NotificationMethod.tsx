@@ -111,7 +111,9 @@ const StyledNotificationMethod = styled.div`
 const TRANSLATIONS = {
   EMAIL_CC_NAME: t('CC recipients'),
   EMAIL_BCC_NAME: t('BCC recipients'),
-  EMAIL_SUBJECT_NAME: t('Email subject name (optional)'),
+  // modify by wht
+  //EMAIL_SUBJECT_NAME: t('Email subject name (optional)'),
+  EMAIL_SUBJECT_NAME: t('Report subject name'),
   EMAIL_SUBJECT_ERROR_TEXT: t(
     'Please enter valid text. Spaces alone are not permitted.',
   ),
@@ -340,12 +342,16 @@ export const NotificationMethod: FunctionComponent<NotificationMethodProps> = ({
             ((!isFeatureEnabled(FeatureFlag.AlertReportSlackV2) ||
               useSlackV1) &&
               method === NotificationMethodOption.Slack) ||
-            method === NotificationMethodOption.Email,
+              //modify by wht 新增Webhook过滤
+              method === NotificationMethodOption.Webhook ||
+              method === NotificationMethodOption.Email
         )
         .map(method => ({
           label:
             method === NotificationMethodOption.SlackV2
               ? NotificationMethodOption.Slack
+              : method === NotificationMethodOption.Webhook
+              ? NotificationMethodOption.Webhook
               : method,
           value: method,
         })),
@@ -356,7 +362,8 @@ export const NotificationMethod: FunctionComponent<NotificationMethodProps> = ({
     return null;
   }
 
-  const onRecipientsChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+  // modify by wht  修改前（仅支持textarea）修改后（同时支持input和textarea）
+  const onRecipientsChange = (event: ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => {
     const { target } = event;
 
     setRecipientValue(target.value);
@@ -480,7 +487,10 @@ export const NotificationMethod: FunctionComponent<NotificationMethodProps> = ({
         <>
           <div className="inline-container">
             <StyledInputContainer>
-              {method === NotificationMethodOption.Email ? (
+              {[
+                NotificationMethodOption.Email,
+                NotificationMethodOption.Webhook,
+              ].includes(method) ? (
                 <>
                   <div className="control-label">
                     {TRANSLATIONS.EMAIL_SUBJECT_NAME}
@@ -515,6 +525,9 @@ export const NotificationMethod: FunctionComponent<NotificationMethodProps> = ({
                   '%s recipients',
                   method === NotificationMethodOption.SlackV2
                     ? NotificationMethodOption.Slack
+                    // modify by wht
+                    : method === NotificationMethodOption.Webhook
+                    ? NotificationMethodOption.Webhook
                     : method,
                 )}
                 <span className="required">*</span>
@@ -539,6 +552,21 @@ export const NotificationMethod: FunctionComponent<NotificationMethodProps> = ({
                       </div>
                     </div>
                   </>
+                  // modify by wht // 新增Webhook分支
+                ) : method === NotificationMethodOption.Webhook ? (
+                  <div className="input-container">
+                    <input
+                      type="url"
+                      name="webhook_url"
+                      data-test="webhook-url"
+                      value={recipientValue}
+                      onChange={onRecipientsChange}
+                      placeholder={t('Enter webhook URL')}
+                    />
+                    <div className="helper">
+                      {t('Please enter a valid webhook URL')}
+                    </div>
+                  </div>
                 ) : (
                   // for SlackV2
                   <div className="input-container">
@@ -639,3 +667,4 @@ export const NotificationMethod: FunctionComponent<NotificationMethodProps> = ({
     </StyledNotificationMethod>
   );
 };
+

@@ -101,7 +101,8 @@ const DEFAULT_RETENTION = 90;
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 const DEFAULT_NOTIFICATION_METHODS: NotificationMethodOption[] = [
-  NotificationMethodOption.Email,
+  // NotificationMethodOption.Email,
+  NotificationMethodOption.Webhook,
 ];
 const DEFAULT_NOTIFICATION_FORMAT = 'PNG';
 const DEFAULT_EXTRA_DASHBOARD_OPTIONS: Extra = {
