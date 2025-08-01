@@ -21,6 +21,8 @@
 # create you own docker environment file (docker/.env) with your own
 # unique random secure passwords and SECRET_KEY.
 # -----------------------------------------------------------------------
+x-superset-image-tag: &superset-image superset-local:${TAG:-latest}
+
 x-superset-volumes:
   &superset-volumes # /app/pythonpath_docker will be appended to the PYTHONPATH in the final container
   - ./docker:/app/docker
@@ -61,6 +63,7 @@ services:
         required: false
     build:
       <<: *common-build
+    image: *superset-image
     container_name: superset_app
     command: ["/app/docker/docker-bootstrap.sh", "app-gunicorn"]
     user: "root"
@@ -78,6 +81,7 @@ services:
     container_name: superset_init
     build:
       <<: *common-build
+    image: *superset-image
     command: ["/app/docker/docker-init.sh"]
     env_file:
       - path: docker/.env # default
@@ -100,6 +104,7 @@ services:
   superset-worker:
     build:
       <<: *common-build
+    image: *superset-image
     container_name: superset_worker
     command: ["/app/docker/docker-bootstrap.sh", "worker"]
     env_file:
@@ -125,6 +130,7 @@ services:
   superset-worker-beat:
     build:
       <<: *common-build
+    image: *superset-image
     container_name: superset_worker_beat
     command: ["/app/docker/docker-bootstrap.sh", "beat"]
     env_file:
