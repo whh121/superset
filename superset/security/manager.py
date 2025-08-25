@@ -2392,7 +2392,11 @@ class SupersetSecurityManager(  # pylint: disable=too-many-public-methods
                     role.id for role in self.get_user_roles()
                 }:
                     return
-
+                # 如果启用了严格模式，不允许通过数据源权限访问 Dashboard
+                if is_feature_enabled("DASHBOARD_RBAC_STRICT"):
+                    raise SupersetSecurityException(
+                        self.get_dashboard_access_error_object(dashboard)
+                    )
             # REGULAR RBAC logic
             # User can only acess the dashboard in case:
             #    It doesn't have any datasets; OR

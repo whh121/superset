@@ -79,7 +79,17 @@ DATA_CACHE_CONFIG = CACHE_CONFIG
 # modify by wht this to add user-defined
 FEATURE_FLAGS = {
     "ALERT_REPORTS": True,
-    'DASHBOARD_RBAC': True
+    'DASHBOARD_RBAC': True,
+    'DASHBOARD_RBAC_STRICT': True,
+    'ENABLE_JAVASCRIPT_CONTROLS': True,
+    'ENABLE_TEMPLATE_PROCESSING': True,  # 启用模板处理
+    'DYNAMIC_PLUGINS': True,  # 启用动态插件
+    'TAGGING_SYSTEM': True,  # 启用标签系统
+    'ENABLE_ADVANCED_DATA_TYPES': True,  # 启用高级数据类型
+    'ENABLE_JSON_EDITOR': True,  # 启用JSON编辑器
+    'SHOW_ADVANCED_CONTROLS': True,  # 显示高级控制面板选项
+    'CORS_OPTIONS': {},  # 设置CORS选项
+    'ENABLE_CORS': True
 }
 
 class CeleryConfig:
@@ -130,6 +140,34 @@ WEBDRIVER_BASEURL = "http://superset:8088/"  # When using docker compose baseurl
 WEBDRIVER_BASEURL_USER_FRIENDLY = "http://172.31.37.206:8088"
 
 SQLLAB_CTAS_NO_LIMIT = True
+
+# 修改 CSP 配置以允许外站图片
+TALISMAN_CONFIG = {
+    "content_security_policy": {
+        "base-uri": ["'self'"],
+        "default-src": ["'self'"],
+        "img-src": [
+            "'self'",
+            "blob:",
+            "data:",
+            "https:",  # 允许所有 HTTPS 图片源
+            # 如果需要 HTTP 图片，添加下面这行（不推荐）
+            # "http:",
+        ],
+        "worker-src": ["'self'", "blob:"],
+        "connect-src": [
+            "'self'",
+            "https://api.mapbox.com",
+            "https://events.mapbox.com",
+        ],
+        "object-src": "'none'",
+        "style-src": ["'self'", "'unsafe-inline'"],
+        "script-src": ["'self'", "'strict-dynamic'"],
+    },
+    "content_security_policy_nonce_in": ["script-src"],
+    "force_https": False,
+    "session_cookie_secure": False,
+}
 
 log_level_text = os.getenv("SUPERSET_LOG_LEVEL", "INFO")
 LOG_LEVEL = getattr(logging, log_level_text.upper(), logging.INFO)
@@ -194,5 +232,14 @@ BABEL_DEFAULT_FOLDER = 'superset/translations'  # 多语言路径
 LANGUAGES = {
     'zh': {'flag': 'cn', 'name': '简体中文'},
     'en': {'flag': 'us', 'name': 'English'}
+}
+
+# 允许图片大小调整 - 扩展 HTML 清理规则
+HTML_SANITIZATION_SCHEMA_EXTENSIONS = {
+    "attributes": {
+        "img": ["style", "width", "height", "class"],  # 允许样式和尺寸属性
+        "div": ["style", "class"],  # 也允许 div 的样式
+        "span": ["style", "class"],  # 允许 span 的样式
+    }
 }
 

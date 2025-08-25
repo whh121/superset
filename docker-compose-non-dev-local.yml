@@ -26,6 +26,7 @@ x-superset-image-tag: &superset-image superset-local:${TAG:-latest}
 x-superset-volumes:
   &superset-volumes # /app/pythonpath_docker will be appended to the PYTHONPATH in the final container
   - ./docker:/app/docker
+  - ./docker/pythonpath_dev:/app/pythonpath  # 挂载配置文件目录
   - superset_home:/app/superset_home
 
 x-common-build: &common-build 
@@ -33,6 +34,9 @@ x-common-build: &common-build
   target: dev
   cache_from:
     - apache/superset-cache:3.10-slim-bookworm
+
+# x-superset-image: &superset-image ${SUPERSET_IMAGE:-superset-local}:${TAG:-latest}
+x-superset-image: &superset-image 145023116201.dkr.ecr.ap-southeast-1.amazonaws.com/bigdata/superset:${TAG:-latest}
 
 services:
   redis:
@@ -156,3 +160,4 @@ volumes:
     external: false
   redis:
     external: false
+
