@@ -40,8 +40,10 @@ from superset.commands.database.uploaders.excel_reader import ExcelReader
 from superset.db_engine_specs.sqlite import SqliteEngineSpec
 from superset.errors import ErrorLevel, SupersetError, SupersetErrorType
 from superset.exceptions import OAuth2RedirectError, SupersetSecurityException
-from superset.sql_parse import Table
+from superset.sql.parse import Table
+from superset.superset_typing import OAuth2State
 from superset.utils import json
+from superset.utils.oauth2 import encode_oauth2_state
 from tests.unit_tests.fixtures.common import (
     create_columnar_file,
     create_csv_file,
@@ -65,7 +67,7 @@ def test_filter_by_uuid(
     from superset.databases.api import DatabaseRestApi
     from superset.models.core import Database
 
-    DatabaseRestApi.datamodel.session = session
+    DatabaseRestApi.datamodel._session = session
 
     # create table for databases
     Database.metadata.create_all(session.get_bind())  # pylint: disable=no-member
@@ -133,7 +135,7 @@ def test_password_mask(
     from superset.databases.api import DatabaseRestApi
     from superset.models.core import Database
 
-    DatabaseRestApi.datamodel.session = session
+    DatabaseRestApi.datamodel._session = session
 
     # create table for databases
     Database.metadata.create_all(session.get_bind())  # pylint: disable=no-member
@@ -189,7 +191,7 @@ def test_database_connection(
     from superset.databases.api import DatabaseRestApi
     from superset.models.core import Database
 
-    DatabaseRestApi.datamodel.session = session
+    DatabaseRestApi.datamodel._session = session
 
     # create table for databases
     Database.metadata.create_all(session.get_bind())  # pylint: disable=no-member
@@ -353,7 +355,7 @@ def test_update_with_password_mask(
     from superset.databases.api import DatabaseRestApi
     from superset.models.core import Database
 
-    DatabaseRestApi.datamodel.session = session
+    DatabaseRestApi.datamodel._session = session
 
     # create table for databases
     Database.metadata.create_all(session.get_bind())  # pylint: disable=no-member
@@ -500,7 +502,7 @@ def test_delete_ssh_tunnel(
         from superset.databases.ssh_tunnel.models import SSHTunnel
         from superset.models.core import Database
 
-        DatabaseRestApi.datamodel.session = session
+        DatabaseRestApi.datamodel._session = session
 
         # create table for databases
         Database.metadata.create_all(session.get_bind())  # pylint: disable=no-member
@@ -578,7 +580,7 @@ def test_delete_ssh_tunnel_not_found(
         from superset.databases.ssh_tunnel.models import SSHTunnel
         from superset.models.core import Database
 
-        DatabaseRestApi.datamodel.session = session
+        DatabaseRestApi.datamodel._session = session
 
         # create table for databases
         Database.metadata.create_all(session.get_bind())  # pylint: disable=no-member
@@ -656,7 +658,7 @@ def test_apply_dynamic_database_filter(
         from superset.databases.api import DatabaseRestApi
         from superset.models.core import Database
 
-        DatabaseRestApi.datamodel.session = session
+        DatabaseRestApi.datamodel._session = session
 
         # create table for databases
         Database.metadata.create_all(session.get_bind())  # pylint: disable=no-member
@@ -719,19 +721,24 @@ def test_apply_dynamic_database_filter(
         # Ensure that the filter has not been called because it's not in our config
         assert base_filter_mock.call_count == 0
 
-        original_config = current_app.config.copy()
-        original_config["EXTRA_DYNAMIC_QUERY_FILTERS"] = {"databases": base_filter_mock}
+        # Temporarily update the config
+        original_filters = current_app.config.get("EXTRA_DYNAMIC_QUERY_FILTERS", {})
+        current_app.config["EXTRA_DYNAMIC_QUERY_FILTERS"] = {
+            "databases": base_filter_mock
+        }
+        try:
+            # Get filtered list
+            response_databases = DatabaseDAO.find_all()
+            assert response_databases
+            expected_db_names = ["second-database"]
+            actual_db_names = [db.database_name for db in response_databases]
+            assert actual_db_names == expected_db_names
 
-        mocker.patch("superset.views.filters.current_app.config", new=original_config)
-        # Get filtered list
-        response_databases = DatabaseDAO.find_all()
-        assert response_databases
-        expected_db_names = ["second-database"]
-        actual_db_names = [db.database_name for db in response_databases]
-        assert actual_db_names == expected_db_names
-
-        # Ensure that the filter has been called once
-        assert base_filter_mock.call_count == 1
+            # Ensure that the filter has been called once
+            assert base_filter_mock.call_count == 1
+        finally:
+            # Restore original config
+            current_app.config["EXTRA_DYNAMIC_QUERY_FILTERS"] = original_filters
 
 
 def test_oauth2_happy_path(
@@ -746,12 +753,13 @@ def test_oauth2_happy_path(
     from superset.databases.api import DatabaseRestApi
     from superset.models.core import Database, DatabaseUserOAuth2Tokens
 
-    DatabaseRestApi.datamodel.session = session
+    DatabaseRestApi.datamodel._session = session
 
     # create table for databases
     Database.metadata.create_all(session.get_bind())  # pylint: disable=no-member
     db.session.add(
         Database(
+            id=1,
             database_name="my_db",
             sqlalchemy_uri="sqlite://",
             uuid=UUID("7c1b7880-a59d-47cd-8bf1-f1eb8d2863cb"),
@@ -771,13 +779,12 @@ def test_oauth2_happy_path(
         "refresh_token": "ZZZ",
     }
 
-    state = {
+    state: OAuth2State = {
         "user_id": 1,
         "database_id": 1,
-        "tab_id": 42,
+        "tab_id": "42",
+        "default_redirect_uri": "http://localhost:8088/api/v1/oauth2/",
     }
-    decode_oauth2_state = mocker.patch("superset.databases.api.decode_oauth2_state")
-    decode_oauth2_state.return_value = state
 
     mocker.patch("superset.databases.api.render_template", return_value="OK")
 
@@ -785,13 +792,12 @@ def test_oauth2_happy_path(
         response = client.get(
             "/api/v1/database/oauth2/",
             query_string={
-                "state": "some%2Estate",
+                "state": encode_oauth2_state(state),
                 "code": "XXX",
             },
         )
 
     assert response.status_code == 200
-    decode_oauth2_state.assert_called_with("some%2Estate")
     get_oauth2_token.assert_called_with({"id": "one", "secret": "two"}, "XXX")
 
     token = db.session.query(DatabaseUserOAuth2Tokens).one()
@@ -816,7 +822,7 @@ def test_oauth2_permissions(
     from superset.databases.api import DatabaseRestApi
     from superset.models.core import Database, DatabaseUserOAuth2Tokens
 
-    DatabaseRestApi.datamodel.session = session
+    DatabaseRestApi.datamodel._session = session
 
     # create table for databases
     Database.metadata.create_all(session.get_bind())  # pylint: disable=no-member
@@ -841,13 +847,12 @@ def test_oauth2_permissions(
         "refresh_token": "ZZZ",
     }
 
-    state = {
+    state: OAuth2State = {
         "user_id": 1,
         "database_id": 1,
-        "tab_id": 42,
+        "tab_id": "42",
+        "default_redirect_uri": "http://localhost:8088/api/v1/oauth2/",
     }
-    decode_oauth2_state = mocker.patch("superset.databases.api.decode_oauth2_state")
-    decode_oauth2_state.return_value = state
 
     mocker.patch("superset.databases.api.render_template", return_value="OK")
 
@@ -855,13 +860,12 @@ def test_oauth2_permissions(
         response = client.get(
             "/api/v1/database/oauth2/",
             query_string={
-                "state": "some%2Estate",
+                "state": encode_oauth2_state(state),
                 "code": "XXX",
             },
         )
 
     assert response.status_code == 200
-    decode_oauth2_state.assert_called_with("some%2Estate")
     get_oauth2_token.assert_called_with({"id": "one", "secret": "two"}, "XXX")
 
     token = db.session.query(DatabaseUserOAuth2Tokens).one()
@@ -884,7 +888,7 @@ def test_oauth2_multiple_tokens(
     from superset.databases.api import DatabaseRestApi
     from superset.models.core import Database, DatabaseUserOAuth2Tokens
 
-    DatabaseRestApi.datamodel.session = session
+    DatabaseRestApi.datamodel._session = session
 
     # create table for databases
     Database.metadata.create_all(session.get_bind())  # pylint: disable=no-member
@@ -916,13 +920,12 @@ def test_oauth2_multiple_tokens(
         },
     ]
 
-    state = {
+    state: OAuth2State = {
         "user_id": 1,
         "database_id": 1,
-        "tab_id": 42,
+        "tab_id": "42",
+        "default_redirect_uri": "http://localhost:8088/api/v1/oauth2/",
     }
-    decode_oauth2_state = mocker.patch("superset.databases.api.decode_oauth2_state")
-    decode_oauth2_state.return_value = state
 
     mocker.patch("superset.databases.api.render_template", return_value="OK")
 
@@ -930,7 +933,7 @@ def test_oauth2_multiple_tokens(
         response = client.get(
             "/api/v1/database/oauth2/",
             query_string={
-                "state": "some%2Estate",
+                "state": encode_oauth2_state(state),
                 "code": "XXX",
             },
         )
@@ -939,7 +942,7 @@ def test_oauth2_multiple_tokens(
         response = client.get(
             "/api/v1/database/oauth2/",
             query_string={
-                "state": "some%2Estate",
+                "state": encode_oauth2_state(state),
                 "code": "XXX",
             },
         )

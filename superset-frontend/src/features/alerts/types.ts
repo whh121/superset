@@ -93,6 +93,17 @@ export type DashboardState = {
   activeTabs?: Array<string>;
   dataMask?: Object;
   anchor?: string;
+  nativeFilters?: Array<ExtraNativeFilter>;
+};
+
+export type ExtraNativeFilter = {
+  filterName?: string;
+  filterType?: string;
+  columnName?: string;
+  columnLabel?: string;
+  filterValues?: Array<any> | [];
+  nativeFilterId?: string | null;
+  optionFilterValues?: Array<any> | [];
 };
 
 export type Extra = {
@@ -192,3 +203,36 @@ export enum ContentType {
   Dashboard = 'dashboard',
   Chart = 'chart',
 }
+
+export type NativeFilterObject = {
+  cascadeParentIds: any[];
+  chartsInScope: number[];
+  controlValues: {
+    defaultToFirstItem: boolean;
+    enableEmptyFilter: boolean;
+    inverseSelection: boolean;
+    multiSelect: boolean;
+    searchAllOptions: boolean;
+  };
+  defaultDataMask: {
+    extraFormData: Record<string, any>;
+    filterState: Record<string, any>;
+    ownState: Record<string, any>;
+  };
+  description: string;
+  filterType: string;
+  id: string;
+  name: string;
+  scope: {
+    excluded: any[];
+    rootPath: string[];
+  };
+  tabsInScope: string[];
+  targets: Array<{
+    column: {
+      name: string;
+    };
+    datasetId: number;
+  }>;
+  type: string;
+};

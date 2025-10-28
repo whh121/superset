@@ -49,10 +49,15 @@ SQLALCHEMY_DATABASE_URI = (
     f"{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_DB}"
 )
 
-SQLALCHEMY_EXAMPLES_URI = (
-    f"{DATABASE_DIALECT}://"
-    f"{EXAMPLES_USER}:{EXAMPLES_PASSWORD}@"
-    f"{EXAMPLES_HOST}:{EXAMPLES_PORT}/{EXAMPLES_DB}"
+# Use environment variable if set, otherwise construct from components
+# This MUST take precedence over any other configuration
+SQLALCHEMY_EXAMPLES_URI = os.getenv(
+    "SUPERSET__SQLALCHEMY_EXAMPLES_URI",
+    (
+        f"{DATABASE_DIALECT}://"
+        f"{EXAMPLES_USER}:{EXAMPLES_PASSWORD}@"
+        f"{EXAMPLES_HOST}:{EXAMPLES_PORT}/{EXAMPLES_DB}"
+    ),
 )
 
 # modify by wht
@@ -75,6 +80,7 @@ CACHE_CONFIG = {
     "CACHE_REDIS_DB": REDIS_RESULTS_DB,
 }
 DATA_CACHE_CONFIG = CACHE_CONFIG
+THUMBNAIL_CACHE_CONFIG = CACHE_CONFIG
 
 # modify by wht this to add user-defined
 FEATURE_FLAGS = {
@@ -190,10 +196,10 @@ if os.getenv("CYPRESS_CONFIG") == "true":
 #
 try:
     import superset_config_docker
-    from superset_config_docker import *  # noqa
+    from superset_config_docker import *  # noqa: F403
 
     logger.info(
-        f"Loaded your Docker configuration at [{superset_config_docker.__file__}]"
+        "Loaded your Docker configuration at [%s]", superset_config_docker.__file__
     )
 except ImportError:
     logger.info("Using default Docker config...")
