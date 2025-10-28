@@ -43,6 +43,12 @@ services:
     image: redis:7
     container_name: superset_cache
     restart: unless-stopped
+    command:
+      - redis-server
+      - --maxmemory 2gb
+      - --maxmemory-policy allkeys-lru
+      - --appendonly no
+      - --save ""
     volumes:
       - redis:/data
 
@@ -80,6 +86,9 @@ services:
     volumes: *superset-volumes
     environment:
       SUPERSET_LOG_LEVEL: "${SUPERSET_LOG_LEVEL:-info}"
+      SERVER_WORKER_AMOUNT: 4
+      GUNICORN_TIMEOUT: 120
+      GUNICORN_KEEPALIVE: 5
 
   superset-init:
     container_name: superset_init

@@ -73,7 +73,7 @@ RESULTS_BACKEND = FileSystemCache("/app/superset_home/sqllab")
 
 CACHE_CONFIG = {
     "CACHE_TYPE": "RedisCache",
-    "CACHE_DEFAULT_TIMEOUT": 300,
+    "CACHE_DEFAULT_TIMEOUT": 86400,
     "CACHE_KEY_PREFIX": "superset_",
     "CACHE_REDIS_HOST": REDIS_HOST,
     "CACHE_REDIS_PORT": REDIS_PORT,
@@ -248,4 +248,28 @@ HTML_SANITIZATION_SCHEMA_EXTENSIONS = {
         "span": ["style", "class"],  # 允许 span 的样式
     }
 }
+
+# 1. 降低查询行数限制（减轻 Doris 负担）
+ROW_LIMIT = 10000
+SAMPLES_ROW_LIMIT = 1000
+FILTER_SELECT_ROW_LIMIT = 5000
+NATIVE_FILTER_DEFAULT_ROW_LIMIT = 500
+
+# 2. 增加超时时间
+SUPERSET_WEBSERVER_TIMEOUT = 120
+SQLLAB_TIMEOUT = 120
+SQLLAB_ASYNC_TIME_LIMIT_SEC = 3600  # 1小时
+
+# 3. 数据库连接池优化（已有，确认配置）
+SQLALCHEMY_ENGINE_OPTIONS = {
+    "pool_size": 10,
+    "pool_recycle": 3600,
+    "pool_pre_ping": True,
+    "max_overflow": 20,
+    "pool_timeout": 30,
+    "isolation_level": "READ COMMITTED",
+}
+
+# 4. 优化缓存配置
+CACHE_DEFAULT_TIMEOUT = 86400  # 1天
 
