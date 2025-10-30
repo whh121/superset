@@ -89,7 +89,7 @@ FEATURE_FLAGS = {
     'DASHBOARD_RBAC_STRICT': True,
     'ENABLE_JAVASCRIPT_CONTROLS': True,
     'ENABLE_TEMPLATE_PROCESSING': True,  # 启用模板处理
-    'DYNAMIC_PLUGINS': True,  # 启用动态插件
+    'DYNAMIC_PLUGINS': False,  # 禁用动态插件（需要额外配置）
     'TAGGING_SYSTEM': True,  # 启用标签系统
     'ENABLE_ADVANCED_DATA_TYPES': True,  # 启用高级数据类型
     'ENABLE_JSON_EDITOR': True,  # 启用JSON编辑器
@@ -147,30 +147,11 @@ WEBDRIVER_BASEURL_USER_FRIENDLY = "http://172.31.37.206:8088"
 
 SQLLAB_CTAS_NO_LIMIT = True
 
-# 修改 CSP 配置以允许外站图片
+# 修改 CSP 配置以允许外站图片和字体
+# 暂时禁用 CSP 以进行调试
+TALISMAN_ENABLED = False
 TALISMAN_CONFIG = {
-    "content_security_policy": {
-        "base-uri": ["'self'"],
-        "default-src": ["'self'"],
-        "img-src": [
-            "'self'",
-            "blob:",
-            "data:",
-            "https:",  # 允许所有 HTTPS 图片源
-            # 如果需要 HTTP 图片，添加下面这行（不推荐）
-            # "http:",
-        ],
-        "worker-src": ["'self'", "blob:"],
-        "connect-src": [
-            "'self'",
-            "https://api.mapbox.com",
-            "https://events.mapbox.com",
-        ],
-        "object-src": "'none'",
-        "style-src": ["'self'", "'unsafe-inline'"],
-        "script-src": ["'self'", "'strict-dynamic'"],
-    },
-    "content_security_policy_nonce_in": ["script-src"],
+    "content_security_policy": None,
     "force_https": False,
     "session_cookie_secure": False,
 }
