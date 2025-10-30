@@ -19,9 +19,11 @@ from dataclasses import dataclass
 from typing import Any, Optional
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pandas as pd
 import pytest
 from flask import current_app
+from pandas.api.types import is_datetime64_dtype
 from pytest_mock import MockerFixture
 
 from superset.exceptions import SupersetException
@@ -44,7 +46,10 @@ from superset.utils.core import (
     QueryObjectFilterClause,
     QuerySource,
     remove_extra_adhoc_filters,
+    sanitize_svg_content,
+    sanitize_url,
 )
+from tests.conftest import with_config
 
 ADHOC_FILTER: QueryObjectFilterClause = {
     "col": "foo",
@@ -223,6 +228,197 @@ def test_normalize_dttm_col() -> None:
     normalize_dttm_col(df, dttm_cols)
 
     assert df["__time"].astype(str).tolist() == ["2017-07-01"]
+
+
+def test_normalize_dttm_col_epoch_seconds() -> None:
+    """Test conversion of epoch seconds."""
+    df = pd.DataFrame(
+        {
+            "epoch_col": [
+                1577836800,
+                1609459200,
+                1640995200,
+            ]  # 2020-01-01, 2021-01-01, 2022-01-01
+        }
+    )
+    dttm_cols = (DateColumn(col_label="epoch_col", timestamp_format="epoch_s"),)
+
+    normalize_dttm_col(df, dttm_cols)
+
+    assert is_datetime64_dtype(df["epoch_col"])
+    assert df["epoch_col"][0].strftime("%Y-%m-%d") == "2020-01-01"
+    assert df["epoch_col"][1].strftime("%Y-%m-%d") == "2021-01-01"
+    assert df["epoch_col"][2].strftime("%Y-%m-%d") == "2022-01-01"
+
+
+def test_normalize_dttm_col_epoch_milliseconds() -> None:
+    """Test conversion of epoch milliseconds."""
+    df = pd.DataFrame(
+        {
+            "epoch_ms_col": [
+                1577836800000,
+                1609459200000,
+                1640995200000,
+            ]  # 2020-01-01, 2021-01-01, 2022-01-01
+        }
+    )
+    dttm_cols = (DateColumn(col_label="epoch_ms_col", timestamp_format="epoch_ms"),)
+
+    normalize_dttm_col(df, dttm_cols)
+
+    assert is_datetime64_dtype(df["epoch_ms_col"])
+    assert df["epoch_ms_col"][0].strftime("%Y-%m-%d") == "2020-01-01"
+    assert df["epoch_ms_col"][1].strftime("%Y-%m-%d") == "2021-01-01"
+    assert df["epoch_ms_col"][2].strftime("%Y-%m-%d") == "2022-01-01"
+
+
+def test_normalize_dttm_col_formatted_date() -> None:
+    """Test conversion of formatted date strings."""
+    df = pd.DataFrame({"date_col": ["2020-01-01", "2021-01-01", "2022-01-01"]})
+    dttm_cols = (DateColumn(col_label="date_col", timestamp_format="%Y-%m-%d"),)
+
+    normalize_dttm_col(df, dttm_cols)
+
+    assert is_datetime64_dtype(df["date_col"])
+    assert df["date_col"][0].strftime("%Y-%m-%d") == "2020-01-01"
+    assert df["date_col"][1].strftime("%Y-%m-%d") == "2021-01-01"
+    assert df["date_col"][2].strftime("%Y-%m-%d") == "2022-01-01"
+
+
+def test_normalize_dttm_col_with_offset() -> None:
+    """Test with hour offset."""
+    df = pd.DataFrame({"date_col": ["2020-01-01", "2021-01-01", "2022-01-01"]})
+    dttm_cols = (
+        DateColumn(col_label="date_col", timestamp_format="%Y-%m-%d", offset=3),
+    )
+
+    normalize_dttm_col(df, dttm_cols)
+
+    assert is_datetime64_dtype(df["date_col"])
+    assert df["date_col"][0].strftime("%Y-%m-%d %H:%M:%S") == "2020-01-01 03:00:00"
+    assert df["date_col"][1].strftime("%Y-%m-%d %H:%M:%S") == "2021-01-01 03:00:00"
+    assert df["date_col"][2].strftime("%Y-%m-%d %H:%M:%S") == "2022-01-01 03:00:00"
+
+
+def test_normalize_dttm_col_with_time_shift() -> None:
+    """Test with time shift."""
+    df = pd.DataFrame({"date_col": ["2020-01-01", "2021-01-01", "2022-01-01"]})
+    dttm_cols = (
+        DateColumn(
+            col_label="date_col", timestamp_format="%Y-%m-%d", time_shift="1 day"
+        ),
+    )
+
+    normalize_dttm_col(df, dttm_cols)
+
+    assert is_datetime64_dtype(df["date_col"])
+    assert df["date_col"][0].strftime("%Y-%m-%d") == "2020-01-02"
+    assert df["date_col"][1].strftime("%Y-%m-%d") == "2021-01-02"
+    assert df["date_col"][2].strftime("%Y-%m-%d") == "2022-01-02"
+
+
+def test_normalize_dttm_col_with_offset_and_time_shift() -> None:
+    """Test with both offset and time shift."""
+    df = pd.DataFrame({"date_col": ["2020-01-01", "2021-01-01", "2022-01-01"]})
+    dttm_cols = (
+        DateColumn(
+            col_label="date_col",
+            timestamp_format="%Y-%m-%d",
+            offset=3,
+            time_shift="1 hour",
+        ),
+    )
+
+    normalize_dttm_col(df, dttm_cols)
+
+    assert is_datetime64_dtype(df["date_col"])
+    assert df["date_col"][0].strftime("%Y-%m-%d %H:%M:%S") == "2020-01-01 04:00:00"
+    assert df["date_col"][1].strftime("%Y-%m-%d %H:%M:%S") == "2021-01-01 04:00:00"
+    assert df["date_col"][2].strftime("%Y-%m-%d %H:%M:%S") == "2022-01-01 04:00:00"
+
+
+def test_normalize_dttm_col_invalid_date_coerced() -> None:
+    """Test that invalid dates are coerced to NaT."""
+    df = pd.DataFrame({"date_col": ["2020-01-01", "invalid_date", "2022-01-01"]})
+    dttm_cols = (DateColumn(col_label="date_col", timestamp_format="%Y-%m-%d"),)
+
+    normalize_dttm_col(df, dttm_cols)
+
+    assert is_datetime64_dtype(df["date_col"])
+    assert df["date_col"][0].strftime("%Y-%m-%d") == "2020-01-01"
+    assert pd.isna(df["date_col"][1])
+    assert df["date_col"][2].strftime("%Y-%m-%d") == "2022-01-01"
+
+
+def test_normalize_dttm_col_invalid_epoch_coerced() -> None:
+    """Test that invalid epoch values are coerced to NaT."""
+    df = pd.DataFrame(
+        {"epoch_col": [1577836800, np.nan, 1640995200]}  # 2020-01-01, NaN, 2022-01-01
+    )
+    dttm_cols = (DateColumn(col_label="epoch_col", timestamp_format="epoch_s"),)
+
+    normalize_dttm_col(df, dttm_cols)
+
+    assert is_datetime64_dtype(df["epoch_col"])
+    assert df["epoch_col"][0].strftime("%Y-%m-%d") == "2020-01-01"
+    assert pd.isna(df["epoch_col"][1])
+    assert df["epoch_col"][2].strftime("%Y-%m-%d") == "2022-01-01"
+
+
+def test_normalize_dttm_col_non_existing_column() -> None:
+    """Test handling of non-existing columns."""
+    df = pd.DataFrame({"existing_col": [1, 2, 3]})
+    dttm_cols = (DateColumn(col_label="non_existing_col", timestamp_format="%Y-%m-%d"),)
+
+    # Should not raise any exception
+    normalize_dttm_col(df, dttm_cols)
+
+    # DataFrame should remain unchanged
+    assert list(df.columns) == ["existing_col"]
+    assert df["existing_col"].tolist() == [1, 2, 3]
+
+
+def test_normalize_dttm_col_multiple_columns() -> None:
+    """Test normalizing multiple datetime columns."""
+    df = pd.DataFrame(
+        {
+            "date_col1": ["2020-01-01", "2021-01-01", "2022-01-01"],
+            "date_col2": ["01/01/2020", "01/01/2021", "01/01/2022"],
+        }
+    )
+    dttm_cols = (
+        DateColumn(col_label="date_col1", timestamp_format="%Y-%m-%d"),
+        DateColumn(col_label="date_col2", timestamp_format="%m/%d/%Y"),
+    )
+
+    normalize_dttm_col(df, dttm_cols)
+
+    assert is_datetime64_dtype(df["date_col1"])
+    assert is_datetime64_dtype(df["date_col2"])
+    assert df["date_col1"][0].strftime("%Y-%m-%d") == "2020-01-01"
+    assert df["date_col2"][0].strftime("%Y-%m-%d") == "2020-01-01"
+
+
+def test_normalize_dttm_col_already_datetime_series() -> None:
+    """Test handling of already datetime series with epoch format."""
+    # Create a DataFrame with timestamp strings
+    df = pd.DataFrame(
+        {
+            "ts_col": [
+                "2020-01-01 00:00:00",
+                "2021-01-01 00:00:00",
+                "2022-01-01 00:00:00",
+            ]
+        }
+    )
+    dttm_cols = (DateColumn(col_label="ts_col", timestamp_format="epoch_s"),)
+
+    normalize_dttm_col(df, dttm_cols)
+
+    assert is_datetime64_dtype(df["ts_col"])
+    assert df["ts_col"][0].strftime("%Y-%m-%d") == "2020-01-01"
+    assert df["ts_col"][1].strftime("%Y-%m-%d") == "2021-01-01"
+    assert df["ts_col"][2].strftime("%Y-%m-%d") == "2022-01-01"
 
 
 def test_check_if_safe_zip_success(app_context: None) -> None:
@@ -421,27 +617,40 @@ def test_get_query_source_from_request(
     referrer: str | None,
     expected: QuerySource | None,
     mocker: MockerFixture,
+    app_context: None,
 ) -> None:
     if referrer:
-        request_mock = mocker.patch("superset.utils.core.request")
-        request_mock.referrer = referrer
+        # Use has_request_context to mock request when not in a request context
+        with mocker.patch("flask.has_request_context", return_value=True):
+            request_mock = mocker.MagicMock()
+            request_mock.referrer = referrer
+            mocker.patch("superset.utils.core.request", request_mock)
+            assert get_query_source_from_request() == expected
+    else:
+        # When no referrer, test without request context
+        with mocker.patch("flask.has_request_context", return_value=False):
+            assert get_query_source_from_request() == expected
 
-    assert get_query_source_from_request() == expected
 
-
-def test_get_user_agent(mocker: MockerFixture) -> None:
+@with_config({"USER_AGENT_FUNC": None})
+def test_get_user_agent(mocker: MockerFixture, app_context: None) -> None:
     database_mock = mocker.MagicMock()
     database_mock.database_name = "mydb"
-
-    current_app_mock = mocker.patch("superset.utils.core.current_app")
-    current_app_mock.config = {"USER_AGENT_FUNC": None}
 
     assert get_user_agent(database_mock, QuerySource.DASHBOARD) == "Apache Superset", (
         "The default user agent should be returned"
     )
-    current_app_mock.config["USER_AGENT_FUNC"] = (
-        lambda database, source: f"{database.database_name} {source.name}"
-    )
+
+
+@with_config(
+    {
+        "USER_AGENT_FUNC": lambda database,
+        source: f"{database.database_name} {source.name}"
+    }
+)
+def test_get_user_agent_custom(mocker: MockerFixture, app_context: None) -> None:
+    database_mock = mocker.MagicMock()
+    database_mock.database_name = "mydb"
 
     assert get_user_agent(database_mock, QuerySource.DASHBOARD) == "mydb DASHBOARD", (
         "the custom user agent function result should have been returned"
@@ -915,3 +1124,41 @@ def test_get_stacktrace():
     except Exception:
         stacktrace = get_stacktrace()
         assert stacktrace is None
+
+
+def test_sanitize_svg_content_safe():
+    """Test that safe SVG content is preserved."""
+    safe_svg = '<svg><rect width="10" height="10"/></svg>'
+    result = sanitize_svg_content(safe_svg)
+    assert "svg" in result
+    assert "rect" in result
+
+
+def test_sanitize_svg_content_removes_scripts():
+    """Test that nh3 removes dangerous script content."""
+    malicious_svg = '<svg><script>alert("xss")</script><rect/></svg>'
+    result = sanitize_svg_content(malicious_svg)
+    assert "script" not in result.lower()
+    assert "alert" not in result
+
+
+def test_sanitize_url_relative():
+    """Test that relative URLs are allowed."""
+    assert sanitize_url("/static/spinner.gif") == "/static/spinner.gif"
+
+
+def test_sanitize_url_safe_absolute():
+    """Test that safe absolute URLs are allowed."""
+    assert (
+        sanitize_url("https://example.com/spinner.gif")
+        == "https://example.com/spinner.gif"
+    )
+    assert (
+        sanitize_url("http://localhost/spinner.png") == "http://localhost/spinner.png"
+    )
+
+
+def test_sanitize_url_blocks_dangerous():
+    """Test that dangerous URL schemes are blocked."""
+    assert sanitize_url("javascript:alert('xss')") == ""
+    assert sanitize_url("data:text/html,<script>alert(1)</script>") == ""

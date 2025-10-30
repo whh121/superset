@@ -120,7 +120,13 @@ class DashboardAccessFilter(BaseFilter):  # pylint: disable=too-few-public-metho
         is_rbac_disabled_filter = []
         dashboard_has_roles = Dashboard.roles.any()
         if is_feature_enabled("DASHBOARD_RBAC"):
-            is_rbac_disabled_filter.append(~dashboard_has_roles)
+            # 如果启用严格模式，完全禁用数据源权限的兜底机制
+            if is_feature_enabled("DASHBOARD_RBAC_STRICT"):
+                # 严格模式：只允许通过角色访问有角色的 Dashboard
+                is_rbac_disabled_filter.append(False)  # 禁用数据源权限查询
+            else:
+                # 标准模式：只有没有角色的 Dashboard 才允许数据源权限访问
+                is_rbac_disabled_filter.append(~dashboard_has_roles)
 
         datasource_perm_query = (
             db.session.query(Dashboard.id)

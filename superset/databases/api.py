@@ -25,13 +25,20 @@ from typing import Any, cast
 from zipfile import is_zipfile, ZipFile
 
 from deprecation import deprecated
-from flask import make_response, render_template, request, Response, send_file
+from flask import (
+    current_app as app,
+    make_response,
+    render_template,
+    request,
+    Response,
+    send_file,
+)
 from flask_appbuilder.api import expose, protect, rison, safe
 from flask_appbuilder.models.sqla.interface import SQLAInterface
 from marshmallow import ValidationError
 from sqlalchemy.exc import NoSuchTableError, OperationalError, SQLAlchemyError
 
-from superset import app, event_logger
+from superset import event_logger
 from superset.commands.database.create import CreateDatabaseCommand
 from superset.commands.database.delete import DeleteDatabaseCommand
 from superset.commands.database.exceptions import (
@@ -118,7 +125,7 @@ from superset.exceptions import (
 )
 from superset.extensions import security_manager
 from superset.models.core import Database
-from superset.sql_parse import Table
+from superset.sql.parse import Table
 from superset.superset_typing import FlaskResponse
 from superset.utils import json
 from superset.utils.core import (
@@ -776,18 +783,35 @@ class DatabaseRestApi(BaseSupersetModelRestApi):
         if not database:
             return self.response_404()
         try:
-            catalog = kwargs["rison"].get("catalog")
+            params = kwargs["rison"]
+            catalog = params.get("catalog")
             schemas = database.get_all_schema_names(
                 catalog=catalog,
                 cache=database.schema_cache_enabled,
                 cache_timeout=database.schema_cache_timeout or None,
-                force=kwargs["rison"].get("force", False),
+                force=params.get("force", False),
             )
             schemas = security_manager.get_schemas_accessible_by_user(
                 database,
                 catalog,
                 schemas,
             )
+            if params.get("upload_allowed"):
+                if not database.allow_file_upload:
+                    return self.response(200, result=[])
+                if allowed_schemas := database.get_schema_access_for_file_upload():
+                    # some databases might return the list of schemas in uppercase,
+                    # while the list of allowed schemas is manually inputted so
+                    # could be lowercase
+                    allowed_schemas = {schema.lower() for schema in allowed_schemas}
+                    return self.response(
+                        200,
+                        result=[
+                            schema
+                            for schema in schemas
+                            if schema.lower() in allowed_schemas
+                        ],
+                    )
             return self.response(200, result=list(schemas))
         except OperationalError:
             return self.response(
@@ -1016,7 +1040,7 @@ class DatabaseRestApi(BaseSupersetModelRestApi):
           - in: query
             schema:
               type: string
-            name: table
+            name: name
             required: true
             description: Table name
           - in: query

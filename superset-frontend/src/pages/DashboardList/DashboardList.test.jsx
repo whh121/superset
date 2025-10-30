@@ -84,6 +84,7 @@ fetchMock.get(dashboardEndpoint, {
 global.URL.createObjectURL = jest.fn();
 fetchMock.get('/thumbnail', { body: new Blob(), sendAsJson: false });
 
+// eslint-disable-next-line no-restricted-globals -- TODO: Migrate from describe blocks
 describe('DashboardList', () => {
   const renderDashboardList = (props = {}, userProp = mockUser) =>
     render(
@@ -106,19 +107,19 @@ describe('DashboardList', () => {
     isFeatureEnabled.mockRestore();
   });
 
-  it('renders', async () => {
+  test('renders', async () => {
     renderDashboardList();
     expect(await screen.findByText('Dashboards')).toBeInTheDocument();
   });
 
-  it('renders a ListView', async () => {
+  test('renders a ListView', async () => {
     renderDashboardList();
     expect(
       await screen.findByTestId('dashboard-list-view'),
     ).toBeInTheDocument();
   });
 
-  it('fetches info', async () => {
+  test('fetches info', async () => {
     renderDashboardList();
     await waitFor(() => {
       const calls = fetchMock.calls(/dashboard\/_info/);
@@ -126,7 +127,7 @@ describe('DashboardList', () => {
     });
   });
 
-  it('fetches data', async () => {
+  test('fetches data', async () => {
     renderDashboardList();
     await waitFor(() => {
       const calls = fetchMock.calls(/dashboard\/\?q/);
@@ -139,18 +140,18 @@ describe('DashboardList', () => {
     );
   });
 
-  it('switches between card and table view', async () => {
+  test('switches between card and table view', async () => {
     renderDashboardList();
 
     // Wait for the list to load
     await screen.findByTestId('dashboard-list-view');
 
     // Initially in card view
-    const cardViewIcon = screen.getByRole('img', { name: 'card-view' });
+    const cardViewIcon = screen.getByRole('img', { name: 'appstore' });
     expect(cardViewIcon).toBeInTheDocument();
 
     // Switch to table view
-    const listViewIcon = screen.getByRole('img', { name: 'list-view' });
+    const listViewIcon = screen.getByRole('img', { name: 'appstore' });
     const listViewButton = listViewIcon.closest('[role="button"]');
     fireEvent.click(listViewButton);
 
@@ -159,14 +160,16 @@ describe('DashboardList', () => {
     fireEvent.click(cardViewButton);
   });
 
-  it('shows edit modal', async () => {
+  test('shows edit modal', async () => {
     renderDashboardList();
 
     // Wait for data to load
     await screen.findByText('title 0');
 
     // Find and click the first more options button
-    const moreIcons = await screen.findAllByRole('img', { name: 'more-vert' });
+    const moreIcons = await screen.findAllByRole('img', {
+      name: 'more',
+    });
     fireEvent.click(moreIcons[0]);
 
     // Click edit from the dropdown
@@ -179,14 +182,16 @@ describe('DashboardList', () => {
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
-  it('shows delete confirmation', async () => {
+  test('shows delete confirmation', async () => {
     renderDashboardList();
 
     // Wait for data to load
     await screen.findByText('title 0');
 
     // Find and click the first more options button
-    const moreIcons = await screen.findAllByRole('img', { name: 'more-vert' });
+    const moreIcons = await screen.findAllByRole('img', {
+      name: 'more',
+    });
     fireEvent.click(moreIcons[0]);
 
     // Click delete from the dropdown
@@ -201,7 +206,7 @@ describe('DashboardList', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders an "Import Dashboard" tooltip', async () => {
+  test('renders an "Import Dashboard" tooltip', async () => {
     renderDashboardList();
 
     const importButton = await screen.findByTestId('import-button');
@@ -215,8 +220,9 @@ describe('DashboardList', () => {
   });
 });
 
+// eslint-disable-next-line no-restricted-globals -- TODO: Migrate from describe blocks
 describe('DashboardList - anonymous view', () => {
-  it('does not render favorite stars for anonymous user', async () => {
+  test('does not render favorite stars for anonymous user', async () => {
     render(
       <MemoryRouter>
         <QueryParamProvider>

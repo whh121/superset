@@ -21,9 +21,12 @@
 # create you own docker environment file (docker/.env) with your own
 # unique random secure passwords and SECRET_KEY.
 # -----------------------------------------------------------------------
+x-superset-image-tag: &superset-image superset-local:${TAG:-latest}
+
 x-superset-volumes:
   &superset-volumes # /app/pythonpath_docker will be appended to the PYTHONPATH in the final container
   - ./docker:/app/docker
+  - ./docker/pythonpath_dev:/app/pythonpath  # 挂载配置文件目录
   - superset_home:/app/superset_home
 
 x-common-build: &common-build 
@@ -32,11 +35,20 @@ x-common-build: &common-build
   cache_from:
     - apache/superset-cache:3.10-slim-bookworm
 
+# x-superset-image: &superset-image ${SUPERSET_IMAGE:-superset-local}:${TAG:-latest}
+x-superset-image: &superset-image 145023116201.dkr.ecr.ap-southeast-1.amazonaws.com/bigdata/superset:${TAG:-latest}
+
 services:
   redis:
     image: redis:7
     container_name: superset_cache
     restart: unless-stopped
+    command:
+      - redis-server
+      - --maxmemory 2gb
+      - --maxmemory-policy allkeys-lru
+      - --appendonly no
+      - --save ""
     volumes:
       - redis:/data
 
@@ -61,6 +73,7 @@ services:
         required: false
     build:
       <<: *common-build
+    image: *superset-image
     container_name: superset_app
     command: ["/app/docker/docker-bootstrap.sh", "app-gunicorn"]
     user: "root"
@@ -73,11 +86,15 @@ services:
     volumes: *superset-volumes
     environment:
       SUPERSET_LOG_LEVEL: "${SUPERSET_LOG_LEVEL:-info}"
+      SERVER_WORKER_AMOUNT: 4
+      GUNICORN_TIMEOUT: 120
+      GUNICORN_KEEPALIVE: 5
 
   superset-init:
     container_name: superset_init
     build:
       <<: *common-build
+    image: *superset-image
     command: ["/app/docker/docker-init.sh"]
     env_file:
       - path: docker/.env # default
@@ -100,6 +117,7 @@ services:
   superset-worker:
     build:
       <<: *common-build
+    image: *superset-image
     container_name: superset_worker
     command: ["/app/docker/docker-bootstrap.sh", "worker"]
     env_file:
@@ -125,6 +143,7 @@ services:
   superset-worker-beat:
     build:
       <<: *common-build
+    image: *superset-image
     container_name: superset_worker_beat
     command: ["/app/docker/docker-bootstrap.sh", "beat"]
     env_file:
@@ -150,3 +169,4 @@ volumes:
     external: false
   redis:
     external: false
+

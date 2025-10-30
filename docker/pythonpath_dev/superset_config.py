@@ -49,10 +49,15 @@ SQLALCHEMY_DATABASE_URI = (
     f"{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_DB}"
 )
 
-SQLALCHEMY_EXAMPLES_URI = (
-    f"{DATABASE_DIALECT}://"
-    f"{EXAMPLES_USER}:{EXAMPLES_PASSWORD}@"
-    f"{EXAMPLES_HOST}:{EXAMPLES_PORT}/{EXAMPLES_DB}"
+# Use environment variable if set, otherwise construct from components
+# This MUST take precedence over any other configuration
+SQLALCHEMY_EXAMPLES_URI = os.getenv(
+    "SUPERSET__SQLALCHEMY_EXAMPLES_URI",
+    (
+        f"{DATABASE_DIALECT}://"
+        f"{EXAMPLES_USER}:{EXAMPLES_PASSWORD}@"
+        f"{EXAMPLES_HOST}:{EXAMPLES_PORT}/{EXAMPLES_DB}"
+    ),
 )
 
 # modify by wht
@@ -68,18 +73,29 @@ RESULTS_BACKEND = FileSystemCache("/app/superset_home/sqllab")
 
 CACHE_CONFIG = {
     "CACHE_TYPE": "RedisCache",
-    "CACHE_DEFAULT_TIMEOUT": 300,
+    "CACHE_DEFAULT_TIMEOUT": 86400,
     "CACHE_KEY_PREFIX": "superset_",
     "CACHE_REDIS_HOST": REDIS_HOST,
     "CACHE_REDIS_PORT": REDIS_PORT,
     "CACHE_REDIS_DB": REDIS_RESULTS_DB,
 }
 DATA_CACHE_CONFIG = CACHE_CONFIG
+THUMBNAIL_CACHE_CONFIG = CACHE_CONFIG
 
 # modify by wht this to add user-defined
 FEATURE_FLAGS = {
     "ALERT_REPORTS": True,
-    'DASHBOARD_RBAC': True
+    'DASHBOARD_RBAC': True,
+    'DASHBOARD_RBAC_STRICT': True,
+    'ENABLE_JAVASCRIPT_CONTROLS': True,
+    'ENABLE_TEMPLATE_PROCESSING': True,  # 启用模板处理
+    'DYNAMIC_PLUGINS': False,  # 禁用动态插件（需要额外配置）
+    'TAGGING_SYSTEM': True,  # 启用标签系统
+    'ENABLE_ADVANCED_DATA_TYPES': True,  # 启用高级数据类型
+    'ENABLE_JSON_EDITOR': True,  # 启用JSON编辑器
+    'SHOW_ADVANCED_CONTROLS': True,  # 显示高级控制面板选项
+    'CORS_OPTIONS': {},  # 设置CORS选项
+    'ENABLE_CORS': True
 }
 
 class CeleryConfig:
@@ -131,6 +147,15 @@ WEBDRIVER_BASEURL_USER_FRIENDLY = "http://172.31.37.206:8088"
 
 SQLLAB_CTAS_NO_LIMIT = True
 
+# 修改 CSP 配置以允许外站图片和字体
+# 暂时禁用 CSP 以进行调试
+TALISMAN_ENABLED = False
+TALISMAN_CONFIG = {
+    "content_security_policy": None,
+    "force_https": False,
+    "session_cookie_secure": False,
+}
+
 log_level_text = os.getenv("SUPERSET_LOG_LEVEL", "INFO")
 LOG_LEVEL = getattr(logging, log_level_text.upper(), logging.INFO)
 
@@ -152,10 +177,10 @@ if os.getenv("CYPRESS_CONFIG") == "true":
 #
 try:
     import superset_config_docker
-    from superset_config_docker import *  # noqa
+    from superset_config_docker import *  # noqa: F403
 
     logger.info(
-        f"Loaded your Docker configuration at [{superset_config_docker.__file__}]"
+        "Loaded your Docker configuration at [%s]", superset_config_docker.__file__
     )
 except ImportError:
     logger.info("Using default Docker config...")
@@ -186,13 +211,46 @@ from datetime import timedelta
 ALERT_MINIMUM_INTERVAL = int(timedelta(minutes=10).total_seconds())
 REPORT_MINIMUM_INTERVAL = int(timedelta(minutes=5).total_seconds())
 
-# 添加汉化支持
-# https://zhuanlan.zhihu.com/p/6623611242
+#添加汉化支持
+#https://zhuanlan.zhihu.com/p/6623611242
 BABEL_DEFAULT_LOCALE='zh'  # 默认语言为中文
 BABEL_DEFAULT_FOLDER = 'superset/translations'  # 多语言路径
-# 可选语言
+#可选语言
 LANGUAGES = {
-     'zh': {'flag': 'cn', 'name': '简体中文'},
-     'en': {'flag': 'us', 'name': 'English'}
+    'zh': {'flag': 'cn', 'name': '简体中文'},
+    'en': {'flag': 'us', 'name': 'English'}
 }
- 
+
+# 允许图片大小调整 - 扩展 HTML 清理规则
+HTML_SANITIZATION_SCHEMA_EXTENSIONS = {
+    "attributes": {
+        "img": ["style", "width", "height", "class"],  # 允许样式和尺寸属性
+        "div": ["style", "class"],  # 也允许 div 的样式
+        "span": ["style", "class"],  # 允许 span 的样式
+    }
+}
+
+# 1. 降低查询行数限制（减轻 Doris 负担）
+ROW_LIMIT = 10000
+SAMPLES_ROW_LIMIT = 1000
+FILTER_SELECT_ROW_LIMIT = 5000
+NATIVE_FILTER_DEFAULT_ROW_LIMIT = 500
+
+# 2. 增加超时时间
+SUPERSET_WEBSERVER_TIMEOUT = 120
+SQLLAB_TIMEOUT = 120
+SQLLAB_ASYNC_TIME_LIMIT_SEC = 3600  # 1小时
+
+# 3. 数据库连接池优化（已有，确认配置）
+SQLALCHEMY_ENGINE_OPTIONS = {
+    "pool_size": 10,
+    "pool_recycle": 3600,
+    "pool_pre_ping": True,
+    "max_overflow": 20,
+    "pool_timeout": 30,
+    "isolation_level": "READ COMMITTED",
+}
+
+# 4. 优化缓存配置
+CACHE_DEFAULT_TIMEOUT = 86400  # 1天
+
