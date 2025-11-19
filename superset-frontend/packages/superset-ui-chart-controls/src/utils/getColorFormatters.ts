@@ -38,20 +38,24 @@ export const getOpacity = (
   minOpacity = MIN_OPACITY_BOUNDED,
   maxOpacity = MAX_OPACITY,
 ) => {
-  if (
-    extremeValue === cutoffPoint ||
-    typeof cutoffPoint !== 'number' ||
-    typeof extremeValue !== 'number' ||
-    typeof value !== 'number'
-  ) {
+  if (extremeValue === cutoffPoint || typeof value !== 'number') {
     return maxOpacity;
   }
+  const numCutoffPoint =
+    typeof cutoffPoint === 'string' ? parseFloat(cutoffPoint) : cutoffPoint;
+  const numExtremeValue =
+    typeof extremeValue === 'string' ? parseFloat(extremeValue) : extremeValue;
+
+  if (isNaN(numCutoffPoint) || isNaN(numExtremeValue)) {
+    return maxOpacity;
+  }
+
   return Math.min(
     maxOpacity,
     round(
       Math.abs(
-        ((maxOpacity - minOpacity) / (extremeValue - cutoffPoint)) *
-          (value - cutoffPoint),
+        ((maxOpacity - minOpacity) / (numExtremeValue - numCutoffPoint)) *
+          (value - numCutoffPoint),
       ) + minOpacity,
       2,
     ),
@@ -267,6 +271,8 @@ export const getColorFormatters = memoizeOne(
         ) {
           acc.push({
             column: config?.column,
+            toAllRow: config?.toAllRow,
+            toTextColor: config?.toTextColor,
             getColorFromValue: getColorFunction(
               { ...config, colorScheme: resolvedColorScheme },
               data.map(row => row[config.column!] as number),

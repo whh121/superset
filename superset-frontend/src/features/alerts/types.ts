@@ -91,7 +91,7 @@ export type MetaObject = {
 
 export type DashboardState = {
   activeTabs?: Array<string>;
-  dataMask?: Object;
+  dataMask?: object;
   anchor?: string;
   nativeFilters?: Array<ExtraNativeFilter>;
 };

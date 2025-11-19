@@ -128,6 +128,7 @@ export type DashboardState = {
     dashboardId: number;
     data: JsonObject;
   };
+  chartStates?: Record<string, any>;
 };
 export type DashboardInfo = {
   id: number;
@@ -245,6 +246,7 @@ export interface DashboardPermalinkState {
   activeTabs: string[];
   anchor: string;
   urlParams?: UrlParamEntries;
+  chartStates?: Record<string, any>;
 }
 
 export interface DashboardPermalinkValue {
@@ -307,4 +309,5 @@ export enum MenuKeys {
   ManageEmbedded = 'manage_embedded',
   ManageEmailReports = 'manage_email_reports',
   ExportPivotXlsx = 'export_pivot_xlsx',
+  EmbedCode = 'embed_code',
 }
