@@ -38,6 +38,12 @@ x-common-build: &common-build
 # x-superset-image: &superset-image ${SUPERSET_IMAGE:-superset-local}:${TAG:-latest}
 x-superset-image: &superset-image 145023116201.dkr.ecr.ap-southeast-1.amazonaws.com/bigdata/superset:${TAG:-latest}
 
+x-superset-env: &superset-env
+  - path: docker/.env        # default
+    required: true
+  - path: docker/.env-${ENV:-dev}   # 可选覆盖，根据 ENV 切换
+    required: false
+
 services:
   redis:
     image: redis:7
@@ -53,11 +59,7 @@ services:
       - redis:/data
 
   db:
-    env_file:
-      - path: docker/.env # default
-        required: true
-      - path: docker/.env-local # optional override
-        required: false
+    env_file: *superset-env
     image: postgres:15
     container_name: superset_db
     restart: unless-stopped
@@ -66,11 +68,7 @@ services:
       - ./docker/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
 
   superset:
-    env_file:
-      - path: docker/.env # default
-        required: true
-      - path: docker/.env-local # optional override
-        required: false
+    env_file: *superset-env
     build:
       <<: *common-build
     image: *superset-image
@@ -96,11 +94,7 @@ services:
       <<: *common-build
     image: *superset-image
     command: ["/app/docker/docker-init.sh"]
-    env_file:
-      - path: docker/.env # default
-        required: true
-      - path: docker/.env-local # optional override
-        required: false
+    env_file: *superset-env
     depends_on:
       db:
         condition: service_started
@@ -120,11 +114,7 @@ services:
     image: *superset-image
     container_name: superset_worker
     command: ["/app/docker/docker-bootstrap.sh", "worker"]
-    env_file:
-      - path: docker/.env # default
-        required: true
-      - path: docker/.env-local # optional override
-        required: false
+    env_file: *superset-env
     restart: unless-stopped
     depends_on:
       superset-init:
@@ -146,11 +136,7 @@ services:
     image: *superset-image
     container_name: superset_worker_beat
     command: ["/app/docker/docker-bootstrap.sh", "beat"]
-    env_file:
-      - path: docker/.env # default
-        required: true
-      - path: docker/.env-local # optional override
-        required: false
+    env_file: *superset-env
     restart: unless-stopped
     depends_on:
       superset-init:
