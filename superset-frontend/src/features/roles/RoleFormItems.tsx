@@ -61,9 +61,11 @@ export const PermissionsField: FC<PermissionsFieldProps> = ({
       options={permissions.map(permission => ({
         label: permission.label,
         value: permission.id,
+	key: permission.id, // 添加唯一key确保虚拟滚动正确渲染
       }))}
       getPopupContainer={trigger => trigger.closest('.ant-modal-content')}
       data-test="permissions-select"
+      virtual={false} // 禁用虚拟滚动以避免渲染问题
     />
   </FormItem>
 );
@@ -88,8 +90,14 @@ export const GroupsField: FC<GroupsFieldProps> = ({ groups }) => (
     <Select
       mode="multiple"
       name="roleGroups"
-      options={groups.map(group => ({ label: group.name, value: group.id }))}
+     // options={groups.map(group => ({ label: group.name, value: group.id }))}
+      options={groups.map(group => ({
+        label: group.name,
+        value: group.id,
+        key: group.id, // 添加唯一key确保虚拟滚动正确渲染
+      }))}
       data-test="groups-select"
+      virtual={false} // 禁用虚拟滚动以避免渲染问题
     />
   </FormItem>
 );
